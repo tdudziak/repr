@@ -7,7 +7,7 @@ include_directories(${LLVM_INCLUDE_DIRS} ${GTEST_INCLUDE_DIRS} ${PROJECT_SOURCE_
 add_definitions(${LLVM_DEFINITIONS})
 
 add_executable(StdlibTests StdlibTests.cpp)
-target_link_libraries(StdlibTests ${GTEST_BOTH_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT} ${EXTRA_LIBS})
+target_link_libraries(StdlibTests ${GTEST_BOTH_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT} ${llvm_libs} ${EXTRA_LIBS})
 add_test(StdlibTests StdlibTests)
 
 add_executable(LLVMTests LLVMTests.cpp)

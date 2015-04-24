@@ -72,8 +72,7 @@ TEST(LLVMTests, Instruction)
 
     EXPECT_EQ("bb", repr(bb));
 
-    // TODO: some extra delimiters to avoid the confusion with commas?
-    EXPECT_EQ("[%0 = add i32 %a, 1, %1 = add i32 %0, 1, ret i32 %1]",
+    EXPECT_EQ("[<%0 = add i32 %a, 1>, <%1 = add i32 %0, 1>, <ret i32 %1>]",
               repr(bb->getInstList()));
 
     llvm::Instruction* inst = &bb->getInstList().front();

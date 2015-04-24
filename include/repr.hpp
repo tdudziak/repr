@@ -141,17 +141,47 @@ void repr_stream(std::ostream& out, const T& xs, overload_priority<5>)
 template <typename T, typename = decltype(val<T>().begin())>
 void repr_stream(std::ostream& out, const T& xs, overload_priority<6>)
 {
-    bool needs_comma = false;
-    out << "[";
+    bool needs_brackets = false;
+    std::vector<std::string> contents;
 
     for (const auto& x : xs) {
+        std::string repr_x = repr(x);
+
+        bool x_needs_brackets = false;
+        for (char c : repr_x) {
+            if (std::isspace(c) || c == ',')
+                x_needs_brackets = true;
+        }
+
+        // bracketing possibly not needed if contents are already delimited
+        if (repr_x.size() >= 2) {
+            char a = repr_x[0];
+            char b = repr_x[repr_x.size()-1];
+
+            if (a == '{' && b == '}')
+                x_needs_brackets = false;
+
+            if (a == '[' && b == ']')
+                x_needs_brackets = false;
+        }
+
+        needs_brackets = needs_brackets || x_needs_brackets;
+        contents.push_back(std::move(repr_x));
+    }
+
+    bool needs_comma = false;
+    out << "[";
+    for (const std::string& x : contents) {
         if (needs_comma)
             out << ", ";
 
-        out << repr(x);
+        if (needs_brackets)
+            out << "<" << x << ">";
+        else
+            out << x;
+
         needs_comma = true;
     }
-
     out << "]";
 }
 
