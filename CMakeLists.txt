@@ -6,6 +6,9 @@ set (repr_VERSION_MINOR 1)
 
 set(CMAKE_CXX_FLAGS "-Wall -std=c++11")
 
+# enable testing
+include(CTest)
+
 # find LLVM
 # find_package(LLVM REQUIRED CONFIG)
 # message(STATUS "Found LLVM ${LLVM_PACKAGE_VERSION}")

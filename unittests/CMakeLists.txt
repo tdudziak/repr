@@ -8,3 +8,4 @@ add_definitions(${LLVM_DEFINITIONS})
 
 add_executable(StdlibTests StdlibTests.cpp)
 target_link_libraries(StdlibTests ${GTEST_BOTH_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT} ${EXTRA_LIBS})
+add_test(StdlibTests StdlibTests)
