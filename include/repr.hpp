@@ -10,6 +10,8 @@ namespace repr_impl
 {
 using std::enable_if;
 using std::is_function;
+using std::is_same;
+using std::remove_cv;
 
 template <typename T> void repr_stream(std::ostream&, const T&);
 } // namespace repr_impl
@@ -47,8 +49,11 @@ void repr_stream(std::ostream& out, const T& x, overload_priority<0>)
     out << "<function@" << &x << ">";
 }
 
-// any pointer type
-template <typename T>
+// A pointer type, excluding char pointers which we assume to be C-style
+// strings. These will be handled by the `ostream-printable' case.
+template <typename T,
+          typename = typename enable_if<
+              !std::is_same<typename remove_cv<T>::type, char>::value>::type>
 void repr_stream(std::ostream& out, T* const& x, overload_priority<1>)
 {
     if (x == nullptr)

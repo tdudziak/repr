@@ -4,7 +4,7 @@ project (repr)
 set (repr_VERSION_MAJOR 0)
 set (repr_VERSION_MINOR 1)
 
-set(CMAKE_CXX_FLAGS "-Wall -std=c++11")
+set(CMAKE_CXX_FLAGS "-Wall -g -std=c++11")
 
 # enable testing
 include(CTest)
