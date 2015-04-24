@@ -12,6 +12,7 @@ using std::enable_if;
 using std::is_function;
 using std::is_same;
 using std::remove_cv;
+using std::remove_extent;
 
 template <typename T> void repr_stream(std::ostream&, const T&);
 } // namespace repr_impl
@@ -35,6 +36,15 @@ template <int n> struct overload_priority : public overload_priority<n + 1>
 {
 };
 
+template <typename T> struct is_string_like
+{
+    static const bool value =
+        is_same<T, char*>::value || is_same<T, const char*>::value ||
+        is_same<typename remove_extent<T>::type, char>::value ||
+        is_same<typename remove_extent<T>::type, const char>::value ||
+        is_same<T, std::string>::value;
+};
+
 // Used in decltype(...) SFINAE guards to provide a value of type T. Not
 // implemented anywhere.
 template <typename T> T val();
@@ -49,12 +59,18 @@ void repr_stream(std::ostream& out, const T& x, overload_priority<0>)
     out << "<function@" << &x << ">";
 }
 
-// A pointer type, excluding char pointers which we assume to be C-style
-// strings. These will be handled by the `ostream-printable' case.
+// string-like: char*, const char*, char[], and std::string
 template <typename T,
-          typename = typename enable_if<
-              !std::is_same<typename remove_cv<T>::type, char>::value>::type>
-void repr_stream(std::ostream& out, T* const& x, overload_priority<1>)
+          typename = typename enable_if<is_string_like<T>::value>::type>
+void repr_stream(std::ostream& out, const T& x, overload_priority<1>)
+{
+    out << "\"" << x << "\"";
+}
+
+// pointers dumb and smart
+template <typename T, typename = decltype(*val<T>()),
+          typename = decltype(val<T>() == nullptr)>
+void repr_stream(std::ostream& out, const T& x, overload_priority<2>)
 {
     if (x == nullptr)
         out << "nullptr";
@@ -64,15 +80,17 @@ void repr_stream(std::ostream& out, T* const& x, overload_priority<1>)
 
 // ostream-printable
 template <typename T, typename = decltype(std::cout << val<T>())>
-void repr_stream(std::ostream& out, const T& x, overload_priority<2>)
+void repr_stream(std::ostream& out, const T& x, overload_priority<3>)
 {
-    out << x;
+    std::ios::fmtflags oldflags(out.flags());
+    out << std::boolalpha << x;
+    out.flags(oldflags);
 }
 
 // iterable (container) of pairs; print like a map
 template <typename T, typename = decltype(val<T>().begin()->first),
           typename = decltype(val<T>().begin()->second)>
-void repr_stream(std::ostream& out, const T& xs, overload_priority<3>)
+void repr_stream(std::ostream& out, const T& xs, overload_priority<4>)
 {
     bool needs_comma = false;
     out << "{";
@@ -90,7 +108,7 @@ void repr_stream(std::ostream& out, const T& xs, overload_priority<3>)
 
 // iterable
 template <typename T, typename = decltype(val<T>().begin())>
-void repr_stream(std::ostream& out, const T& xs, overload_priority<4>)
+void repr_stream(std::ostream& out, const T& xs, overload_priority<5>)
 {
     bool needs_comma = false;
     out << "[";
