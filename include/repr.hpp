@@ -4,8 +4,32 @@
 #include <iostream>
 #include <sstream>
 #include <type_traits>
+#include <algorithm>
+#include <functional>
+
+#include <llvm/Support/raw_ostream.h>
 
 // forward declaration
+namespace repr_impl
+{
+template <typename T> void repr_stream(std::ostream&, const T&);
+} // namespace repr_impl
+
+template <typename T> std::string repr(const T& x)
+{
+    std::ostringstream out;
+    repr_impl::repr_stream(out, x);
+
+    auto not_space = std::not1(std::ptr_fun<int, int>(std::isspace));
+    std::string result = out.str();
+    result.erase(result.begin(),
+                 std::find_if(result.begin(), result.end(), not_space));
+    result.erase(std::find_if(result.rbegin(), result.rend(), not_space).base(),
+                 result.end());
+
+    return result;
+}
+
 namespace repr_impl
 {
 using std::enable_if;
@@ -14,18 +38,6 @@ using std::is_same;
 using std::remove_cv;
 using std::remove_extent;
 
-template <typename T> void repr_stream(std::ostream&, const T&);
-} // namespace repr_impl
-
-template <typename T> std::string repr(const T& x)
-{
-    std::ostringstream out;
-    repr_impl::repr_stream(out, x);
-    return out.str();
-}
-
-namespace repr_impl
-{
 template <int n> struct overload_priority;
 
 template <> struct overload_priority<100>
@@ -78,9 +90,28 @@ void repr_stream(std::ostream& out, const T& x, overload_priority<2>)
         out << repr(*x);
 }
 
+// LLVM nameable values
+// It's tempting to just provide a non-template overload for llvm::Value& but
+// it might mess with overload resolution and overload_priority.
+template <typename T, typename = decltype(val<T&>().getName().str()),
+          typename = decltype(val<llvm::raw_ostream&>() << val<T&>())>
+void repr_stream(std::ostream& out, const T& x, overload_priority<3>)
+{
+    std::string name = x.getName().str();
+
+    if (name.size() > 0) {
+        out << name;
+    } else {
+        std::string result;
+        llvm::raw_string_ostream raw(result);
+        raw << x;
+        out << result;
+    }
+}
+
 // ostream-printable
 template <typename T, typename = decltype(std::cout << val<T>())>
-void repr_stream(std::ostream& out, const T& x, overload_priority<3>)
+void repr_stream(std::ostream& out, const T& x, overload_priority<4>)
 {
     std::ios::fmtflags oldflags(out.flags());
     out << std::boolalpha << x;
@@ -90,7 +121,7 @@ void repr_stream(std::ostream& out, const T& x, overload_priority<3>)
 // iterable (container) of pairs; print like a map
 template <typename T, typename = decltype(val<T>().begin()->first),
           typename = decltype(val<T>().begin()->second)>
-void repr_stream(std::ostream& out, const T& xs, overload_priority<4>)
+void repr_stream(std::ostream& out, const T& xs, overload_priority<5>)
 {
     bool needs_comma = false;
     out << "{";
@@ -108,7 +139,7 @@ void repr_stream(std::ostream& out, const T& xs, overload_priority<4>)
 
 // iterable
 template <typename T, typename = decltype(val<T>().begin())>
-void repr_stream(std::ostream& out, const T& xs, overload_priority<5>)
+void repr_stream(std::ostream& out, const T& xs, overload_priority<6>)
 {
     bool needs_comma = false;
     out << "[";
@@ -122,6 +153,17 @@ void repr_stream(std::ostream& out, const T& xs, overload_priority<5>)
     }
 
     out << "]";
+}
+
+// LLVM objects that don't have getName but can be printed to a raw_ostream
+template <typename T,
+          typename = decltype(val<llvm::raw_ostream&>() << val<T>())>
+void repr_stream(std::ostream& out, const T& x, overload_priority<7>)
+{
+    std::string result;
+    llvm::raw_string_ostream raw(result);
+    raw << x;
+    out << result;
 }
 
 // other: just print the address

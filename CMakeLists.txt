@@ -10,9 +10,9 @@ set(CMAKE_CXX_FLAGS "-Wall -g -std=c++11")
 include(CTest)
 
 # find LLVM
-# find_package(LLVM REQUIRED CONFIG)
-# message(STATUS "Found LLVM ${LLVM_PACKAGE_VERSION}")
-# message(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")
+find_package(LLVM REQUIRED CONFIG)
+message(STATUS "Found LLVM ${LLVM_PACKAGE_VERSION}")
+message(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")
 
 add_subdirectory(unittests)
 
