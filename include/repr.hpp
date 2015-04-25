@@ -7,7 +7,9 @@
 #include <algorithm>
 #include <functional>
 
+#ifdef ENABLE_REPR_LLVM
 #include <llvm/Support/raw_ostream.h>
+#endif
 
 // forward declaration
 namespace repr_impl
@@ -90,6 +92,7 @@ void repr_stream(std::ostream& out, const T& x, overload_priority<2>)
         out << repr(*x);
 }
 
+#ifdef ENABLE_REPR_LLVM
 // LLVM nameable values
 // It's tempting to just provide a non-template overload for llvm::Value& but
 // it might mess with overload resolution and overload_priority.
@@ -108,6 +111,7 @@ void repr_stream(std::ostream& out, const T& x, overload_priority<3>)
         out << result;
     }
 }
+#endif
 
 // ostream-printable
 template <typename T, typename = decltype(std::cout << val<T>())>
@@ -185,6 +189,7 @@ void repr_stream(std::ostream& out, const T& xs, overload_priority<6>)
     out << "]";
 }
 
+#ifdef ENABLE_REPR_LLVM
 // LLVM objects that don't have getName but can be printed to a raw_ostream
 template <typename T,
           typename = decltype(val<llvm::raw_ostream&>() << val<T>())>
@@ -195,6 +200,7 @@ void repr_stream(std::ostream& out, const T& x, overload_priority<7>)
     raw << x;
     out << result;
 }
+#endif
 
 // other: just print the address
 template <typename T>
