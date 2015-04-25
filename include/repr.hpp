@@ -7,6 +7,11 @@
 #include <algorithm>
 #include <functional>
 
+// automatically enable LLVM support if llvm-c/Core.h was included
+#ifdef LLVM_C_CORE_H
+#define ENABLE_REPR_LLVM 1
+#endif
+
 #ifdef ENABLE_REPR_LLVM
 #include <llvm/Support/raw_ostream.h>
 #endif
