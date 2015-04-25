@@ -2,6 +2,7 @@
 #include <set>
 #include <map>
 #include <memory>
+#include <tuple>
 
 #include <gtest/gtest.h>
 #include <repr.hpp>
@@ -72,4 +73,23 @@ TEST(StdlibTests, Booleans)
     EXPECT_EQ("0", repr((int) false));
     EXPECT_EQ("false", repr(false));
     EXPECT_EQ("true", repr(true));
+}
+
+TEST(StdlibTests, Tuple)
+{
+    EXPECT_EQ("()", repr(std::make_tuple()));
+    EXPECT_EQ("(1)", repr(std::make_tuple(1)));
+    EXPECT_EQ("(1, 2)", repr(std::make_tuple(1, 2)));
+
+    std::tuple<int, int, int> foo = std::make_tuple(1, 2, 3);
+    const std::tuple<int, int, int>& bar(foo);
+
+    EXPECT_EQ("(1, 2, 3)", repr(foo));
+    EXPECT_EQ("(1, 2, 3)", repr(bar));
+}
+
+TEST(StdlibTests, Array)
+{
+    std::array<int, 5> arr = {1, 2, 3, 4, 5};
+    EXPECT_EQ("(1, 2, 3, 4, 5)", repr(arr));
 }

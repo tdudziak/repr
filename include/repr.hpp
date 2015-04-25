@@ -55,6 +55,20 @@ template <int n> struct overload_priority : public overload_priority<n + 1>
 {
 };
 
+template <typename T, int n> struct tuple_repr
+{
+    void operator()(const T& tuple, std::vector<std::string>* out)
+    {
+        tuple_repr<T, n - 1>()(tuple, out);
+        out->push_back(repr(std::get<n - 1>(tuple)));
+    }
+};
+
+template <typename T> struct tuple_repr<T, 0>
+{
+    void operator()(const T&, std::vector<std::string>*) {}
+};
+
 template <typename T> struct is_string_like
 {
     static const bool value =
@@ -118,9 +132,30 @@ void repr_stream(std::ostream& out, const T& x, overload_priority<3>)
 }
 #endif
 
+// tuples and tuple-like things like std::pair and std::array
+template <typename T, typename = typename std::enable_if<
+                          std::tuple_size<T>::value >= 0>::type>
+void repr_stream(std::ostream& out, const T& x, overload_priority<4>)
+{
+    tuple_repr<T, std::tuple_size<T>::value> tr;
+    std::vector<std::string> sub_reprs;
+    tr(x, &sub_reprs);
+
+    out << "(";
+    bool needs_comma = false;
+    for (auto& x : sub_reprs) {
+        if (needs_comma)
+            out << ", ";
+
+        out << x;
+        needs_comma = true;
+    }
+    out << ")";
+}
+
 // ostream-printable
 template <typename T, typename = decltype(std::cout << val<T>())>
-void repr_stream(std::ostream& out, const T& x, overload_priority<4>)
+void repr_stream(std::ostream& out, const T& x, overload_priority<5>)
 {
     std::ios::fmtflags oldflags(out.flags());
     out << std::boolalpha << x;
@@ -130,7 +165,7 @@ void repr_stream(std::ostream& out, const T& x, overload_priority<4>)
 // iterable (container) of pairs; print like a map
 template <typename T, typename = decltype(val<T>().begin()->first),
           typename = decltype(val<T>().begin()->second)>
-void repr_stream(std::ostream& out, const T& xs, overload_priority<5>)
+void repr_stream(std::ostream& out, const T& xs, overload_priority<6>)
 {
     bool needs_comma = false;
     out << "{";
@@ -148,7 +183,7 @@ void repr_stream(std::ostream& out, const T& xs, overload_priority<5>)
 
 // iterable
 template <typename T, typename = decltype(val<T>().begin())>
-void repr_stream(std::ostream& out, const T& xs, overload_priority<6>)
+void repr_stream(std::ostream& out, const T& xs, overload_priority<7>)
 {
     bool needs_brackets = false;
     std::vector<std::string> contents;
@@ -165,7 +200,7 @@ void repr_stream(std::ostream& out, const T& xs, overload_priority<6>)
         // bracketing possibly not needed if contents are already delimited
         if (repr_x.size() >= 2) {
             char a = repr_x[0];
-            char b = repr_x[repr_x.size()-1];
+            char b = repr_x[repr_x.size() - 1];
 
             if (a == '{' && b == '}')
                 x_needs_brackets = false;
@@ -198,7 +233,7 @@ void repr_stream(std::ostream& out, const T& xs, overload_priority<6>)
 // LLVM objects that don't have getName but can be printed to a raw_ostream
 template <typename T,
           typename = decltype(val<llvm::raw_ostream&>() << val<T>())>
-void repr_stream(std::ostream& out, const T& x, overload_priority<7>)
+void repr_stream(std::ostream& out, const T& x, overload_priority<8>)
 {
     std::string result;
     llvm::raw_string_ostream raw(result);
