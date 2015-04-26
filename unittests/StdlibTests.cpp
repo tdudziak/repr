@@ -75,6 +75,19 @@ TEST(StdlibTests, Booleans)
     EXPECT_EQ("true", repr(true));
 }
 
+TEST(StdlibTest, PairLike)
+{
+    pair<int, string> foo = {7, "seven"};
+    auto foo_foo = make_pair(foo, foo);
+
+    EXPECT_EQ("(7, \"seven\")", repr(foo));
+    EXPECT_EQ("((7, \"seven\"), (7, \"seven\"))", repr(foo_foo));
+    EXPECT_EQ("(1, 2)", repr(make_tuple(1, 2)));
+
+    array<int, 2> arr = {{13, 37}};
+    EXPECT_EQ("(13, 37)", repr(arr));
+}
+
 TEST(StdlibTests, Tuple)
 {
     EXPECT_EQ("()", repr(std::make_tuple()));
@@ -90,6 +103,6 @@ TEST(StdlibTests, Tuple)
 
 TEST(StdlibTests, Array)
 {
-    std::array<int, 5> arr = {1, 2, 3, 4, 5};
+    std::array<int, 5> arr = {{1, 2, 3, 4, 5}};
     EXPECT_EQ("(1, 2, 3, 4, 5)", repr(arr));
 }
