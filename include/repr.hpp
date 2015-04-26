@@ -45,13 +45,19 @@ using std::is_same;
 using std::remove_cv;
 using std::remove_extent;
 
-template <int n> struct overload_priority;
-
-template <> struct overload_priority<100>
+/**
+ * Dummy struct used to resolve ambiguous function overloads.
+ *
+ * If `overload_priority<0>()` is passed as an argument to a function, the
+ * overloads with a formal argument of type `overload_priority<n>` will be
+ * preferred for the smallest `n`. This helps to reduce guards in SFINAE-like
+ * template hacks.
+ */
+template <int n> struct overload_priority : public overload_priority<n + 1>
 {
 };
 
-template <int n> struct overload_priority : public overload_priority<n + 1>
+template <> struct overload_priority<100>
 {
 };
 
@@ -69,6 +75,9 @@ template <typename T> struct tuple_repr<T, 0>
     void operator()(const T&, std::vector<std::string>*) {}
 };
 
+/**
+ * Trait for testing whether a type is a C-style string or std::string.
+ */
 template <typename T> struct is_string_like
 {
     static const bool value =
@@ -78,8 +87,12 @@ template <typename T> struct is_string_like
         is_same<T, std::string>::value;
 };
 
-// Used in decltype(...) SFINAE guards to provide a value of type T. Not
-// implemented anywhere.
+/**
+ * Unimplemented function that provides a value of a given type.
+ *
+ * This function cannot be called but it can be used in `decltype(...)` to get
+ * a type of expressions using values of a given type.
+ */
 template <typename T> T val();
 
 // function type (NOT std::function)
