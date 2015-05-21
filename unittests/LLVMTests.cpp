@@ -17,20 +17,21 @@ using namespace llvm;
 
 std::unique_ptr<llvm::Module> parseAssembly(const std::string& assembly)
 {
-    std::unique_ptr<llvm::Module> module(
-        new llvm::Module("Module", llvm::getGlobalContext()));
-
+    std::unique_ptr<llvm::Module> module;
     llvm::SMDiagnostic error;
-    bool success = ParseAssemblyString(assembly.c_str(), module.get(), error,
-                                       module->getContext()) == module.get();
 
-    std::string ErrMsg;
-    llvm::raw_string_ostream OS(ErrMsg);
-    error.print("", OS);
+#if LLVM35
+    module.reset(new llvm::Module("Module", llvm::getGlobalContext()));
 
-    // A failure here means that the test itself is buggy.
-    if (!success)
-        llvm::report_fatal_error(OS.str().c_str());
+    auto res = llvm::ParseAssemblyString(assembly.c_str(), module.get(), error,
+                                         module->getContext());
+
+    assert(res == module.get());
+#elif LLVM36
+    module = llvm::parseAssemblyString(assembly.c_str(), error,
+                                       llvm::getGlobalContext());
+    assert(module != nullptr);
+#endif
 
     return module;
 }
@@ -38,10 +39,18 @@ std::unique_ptr<llvm::Module> parseAssembly(const std::string& assembly)
 std::unique_ptr<llvm::Module> getTestModule(const std::string& name)
 {
     llvm::SMDiagnostic error;
-    auto res = llvm::ParseAssemblyFile(TEST_DATA_DIR "/" + name, error,
-                                       llvm::getGlobalContext());
-    assert(res != nullptr);
-    return std::unique_ptr<llvm::Module>(res);
+    std::unique_ptr<llvm::Module> module;
+
+#if LLVM35
+    module.reset(llvm::ParseAssemblyFile(TEST_DATA_DIR "/" + name + "-3.5.ll",
+                                         error, llvm::getGlobalContext()));
+#elif LLVM36
+    module = llvm::parseAssemblyFile(TEST_DATA_DIR "/" + name + "-3.6.ll",
+                                     error, llvm::getGlobalContext());
+#endif
+
+    assert(module.get() != nullptr);
+    return module;
 }
 
 std::string foo_src = "define i32 @foo(i32 %a) #0 {\n"
@@ -93,7 +102,7 @@ TEST(LLVMTests, Instruction)
 
 TEST(LLVMTests, DebugLocations)
 {
-    auto module = getTestModule("debug_unopt.ll");
+    auto module = getTestModule("debug_unopt");
     llvm::Function* func = module->begin();
 
     auto itr = func->begin();
