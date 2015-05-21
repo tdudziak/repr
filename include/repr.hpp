@@ -14,6 +14,12 @@
 
 #ifdef ENABLE_REPR_LLVM
 #include <llvm/Support/raw_ostream.h>
+
+#include <llvm/IR/BasicBlock.h>
+#include <llvm/IR/Value.h>
+#include <llvm/IR/Instruction.h>
+#include <llvm/IR/DebugInfo.h>
+#include <llvm/IR/DebugLoc.h>
 #endif
 
 // forward declaration
@@ -44,6 +50,25 @@ using std::is_function;
 using std::is_same;
 using std::remove_cv;
 using std::remove_extent;
+
+#ifdef ENABLE_REPR_LLVM
+inline void repr_debug_loc(std::ostream& out, const llvm::Value& val)
+{
+    using namespace llvm;
+
+    if (auto bb_ptr = dyn_cast<BasicBlock>(&val)) {
+        // find the first instruction with debug info
+        for (auto& inst : *bb_ptr) {
+            if (MDNode* md = inst.getMetadata("dbg")) {
+                DILocation loc(md);
+                out << "@(" << loc.getFilename().str() << ":"
+                    << loc.getLineNumber() << ")";
+                return;
+            }
+        }
+    }
+}
+#endif
 
 /**
  * Dummy struct used to resolve ambiguous function overloads.
@@ -125,11 +150,9 @@ void repr_stream(std::ostream& out, const T& x, overload_priority<2>)
 }
 
 #ifdef ENABLE_REPR_LLVM
-// LLVM nameable values
-// It's tempting to just provide a non-template overload for llvm::Value& but
-// it might mess with overload resolution and overload_priority.
-template <typename T, typename = decltype(val<T&>().getName().str()),
-          typename = decltype(val<llvm::raw_ostream&>() << val<T&>())>
+// all LLVM values
+template <typename T,
+          typename = decltype(repr_debug_loc(val<std::ostream&>(), val<T&>()))>
 void repr_stream(std::ostream& out, const T& x, overload_priority<3>)
 {
     std::string name = x.getName().str();
@@ -142,6 +165,8 @@ void repr_stream(std::ostream& out, const T& x, overload_priority<3>)
         raw << x;
         out << result;
     }
+
+    repr_debug_loc(out, x);
 }
 #endif
 
@@ -243,7 +268,7 @@ void repr_stream(std::ostream& out, const T& xs, overload_priority<7>)
 }
 
 #ifdef ENABLE_REPR_LLVM
-// LLVM objects that don't have getName but can be printed to a raw_ostream
+// other LLVM objects that can be printed to a raw_ostream
 template <typename T,
           typename = decltype(val<llvm::raw_ostream&>() << val<T>())>
 void repr_stream(std::ostream& out, const T& x, overload_priority<8>)

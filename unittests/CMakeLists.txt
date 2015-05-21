@@ -1,9 +1,12 @@
 find_package(GTest REQUIRED)
 find_package(Threads REQUIRED)
 
+get_filename_component(TEST_DATA_DIR "data" ABSOLUTE)
+configure_file("test_config.h.in" "test_config.h")
+
 llvm_map_components_to_libnames(llvm_libs support core irreader)
 
-include_directories(${LLVM_INCLUDE_DIRS} ${GTEST_INCLUDE_DIRS} ${PROJECT_SOURCE_DIR}/include)
+include_directories(${LLVM_INCLUDE_DIRS} ${GTEST_INCLUDE_DIRS} ${PROJECT_SOURCE_DIR}/include ${CMAKE_CURRENT_BINARY_DIR})
 add_definitions(${LLVM_DEFINITIONS})
 
 add_executable(StdlibTests StdlibTests.cpp)

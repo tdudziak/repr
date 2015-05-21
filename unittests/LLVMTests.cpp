@@ -6,9 +6,12 @@
 #include <llvm/Support/ErrorHandling.h>
 #include <llvm/Support/SourceMgr.h>
 #include <llvm/Support/raw_ostream.h>
+#include <llvm/Support/MemoryBuffer.h>
 
 #include <gtest/gtest.h>
 #include <repr.hpp>
+
+#include "test_config.h"
 
 using namespace llvm;
 
@@ -30,6 +33,15 @@ std::unique_ptr<llvm::Module> parseAssembly(const std::string& assembly)
         llvm::report_fatal_error(OS.str().c_str());
 
     return module;
+}
+
+std::unique_ptr<llvm::Module> getTestModule(const std::string& name)
+{
+    llvm::SMDiagnostic error;
+    auto res = llvm::ParseAssemblyFile(TEST_DATA_DIR "/" + name, error,
+                                       llvm::getGlobalContext());
+    assert(res != nullptr);
+    return std::unique_ptr<llvm::Module>(res);
 }
 
 std::string foo_src = "define i32 @foo(i32 %a) #0 {\n"
@@ -77,4 +89,21 @@ TEST(LLVMTests, Instruction)
 
     llvm::Instruction* inst = &bb->getInstList().front();
     EXPECT_EQ("%0 = add i32 %a, 1", repr(inst));
+}
+
+TEST(LLVMTests, DebugLocations)
+{
+    auto module = getTestModule("debug_unopt.ll");
+    llvm::Function* func = module->begin();
+
+    auto itr = func->begin();
+    llvm::BasicBlock* bb = itr++;
+    llvm::BasicBlock* bb3 = itr++;
+    llvm::BasicBlock* bb5 = itr++;
+    llvm::BasicBlock* bb8 = itr++;
+
+    EXPECT_EQ("bb@(debug.c:1)", repr(bb));
+    EXPECT_EQ("bb3@(debug.c:6)", repr(bb3));
+    EXPECT_EQ("bb5@(debug.c:8)", repr(bb5));
+    EXPECT_EQ("bb8@(debug.c:10)", repr(bb8));
 }

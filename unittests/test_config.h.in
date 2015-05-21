@@ -1,0 +1,20 @@
+#ifndef TEST_CONFIG_H
+#define TEST_CONFIG_H
+
+#define TEST_DATA_DIR "@TEST_DATA_DIR@"
+
+#include <llvm/Config/llvm-config.h>
+
+#if LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR == 5
+#define LLVM35 1
+#endif
+
+#if LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR == 6
+#define LLVM36 1
+#endif
+
+#if !defined(LLVM35) && !defined(LLVM36)
+#error Unsupported version of LLVM
+#endif
+
+#endif
