@@ -50,6 +50,7 @@ using std::is_function;
 using std::is_same;
 using std::remove_cv;
 using std::remove_extent;
+using std::remove_reference;
 
 #ifdef ENABLE_REPR_LLVM
 inline void repr_debug_loc(std::ostream& out, const llvm::Value& val)
@@ -219,9 +220,24 @@ void repr_stream(std::ostream& out, const T& xs, overload_priority<6>)
     out << "}";
 }
 
+// iterable (container) of chars; print like a string
+// FIXME: ugly blob of template magic
+template <typename T,
+          typename = typename enable_if<is_same<
+              char, typename remove_cv<typename remove_reference<decltype(
+                        *(val<T>().begin()))>::type>::type>::value>::type>
+void repr_stream(std::ostream& out, const T& xs, overload_priority<7>)
+{
+    out << "\"";
+    for (auto x : xs) {
+        out << x;
+    }
+    out << "\"";
+}
+
 // iterable
 template <typename T, typename = decltype(val<T>().begin())>
-void repr_stream(std::ostream& out, const T& xs, overload_priority<7>)
+void repr_stream(std::ostream& out, const T& xs, overload_priority<8>)
 {
     bool needs_brackets = false;
     std::vector<std::string> contents;
@@ -271,7 +287,7 @@ void repr_stream(std::ostream& out, const T& xs, overload_priority<7>)
 // other LLVM objects that can be printed to a raw_ostream
 template <typename T,
           typename = decltype(val<llvm::raw_ostream&>() << val<T>())>
-void repr_stream(std::ostream& out, const T& x, overload_priority<8>)
+void repr_stream(std::ostream& out, const T& x, overload_priority<9>)
 {
     std::string result;
     llvm::raw_string_ostream raw(result);

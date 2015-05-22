@@ -17,10 +17,12 @@ TEST(StdlibTests, StdString)
 
 TEST(StdlibTests, CString)
 {
-    char* foo1 = (char*)"foobar";
+    char foo[] = "foobar";
+    char* foo1 = (char*) foo;
     const char* foo2 = foo1;
     const char* emp = "";
 
+    EXPECT_EQ("\"foobar\"", repr(foo));
     EXPECT_EQ("\"foobar\"", repr(foo1));
     EXPECT_EQ("\"foobar\"", repr(foo2));
     EXPECT_EQ("\"\"", repr(emp));
@@ -40,6 +42,9 @@ TEST(StdlibTests, Vector)
     EXPECT_EQ(repr(iv), "[1, 2, 3, 4, 5]");
     EXPECT_EQ(repr(emp), "[]");
     EXPECT_EQ(repr(vov), "[[1, 2], [3, 4]]");
+
+    vector<char> cvec = {'f', 'o', 'o'};
+    EXPECT_EQ(repr(cvec), "\"foo\"");
 }
 
 TEST(StdlibTests, Map)

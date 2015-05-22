@@ -116,3 +116,10 @@ TEST(LLVMTests, DebugLocations)
     EXPECT_EQ("bb5@(debug.c:8)", repr(bb5));
     EXPECT_EQ("bb8@(debug.c:10)", repr(bb8));
 }
+
+TEST(LLVMTests, StringRef)
+{
+    std::string foo = "Hello, world!";
+    llvm::StringRef sref(foo);
+    EXPECT_EQ("\"Hello, world!\"", repr(sref));
+}
