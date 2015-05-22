@@ -1,3 +1,10 @@
+/**
+ * A template-based, LLVM-enabled pretty-printer.
+ *
+ * Full sources and license information available on the
+ * <a href="http://github.com/tdudziak/repr">project website</a>.
+ */
+
 #ifndef REPR_HPP
 #define REPR_HPP
 
