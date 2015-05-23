@@ -25,6 +25,7 @@
 #include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/Value.h>
 #include <llvm/IR/Instruction.h>
+#include <llvm/IR/Instructions.h>
 #include <llvm/IR/DebugInfo.h>
 #include <llvm/IR/DebugLoc.h>
 #endif
@@ -74,6 +75,51 @@ inline void repr_debug_loc(std::ostream& out, const llvm::Value& val)
                 return;
             }
         }
+    }
+
+    auto* inst_ptr = dyn_cast<Instruction>(&val);
+    MDNode* md = inst_ptr ? inst_ptr->getMetadata("dbg") : nullptr;
+    if (md) {
+        DILocation loc(md);
+        out << "(";
+
+        // try to find a call to llvm.dbg.value in the same BB, after the
+        // instruction, to get variable name
+        auto itr = inst_ptr->getParent()->begin();
+        while (&*itr != inst_ptr)
+            ++itr;
+
+        for (; itr != inst_ptr->getParent()->end(); ++itr) {
+            if (auto* as_call = dyn_cast<CallInst>(&*itr)) {
+                auto name = as_call->getCalledFunction()->getName().str();
+                if (name != "llvm.dbg.value")
+                    continue;
+
+#if LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR <= 5
+                // LLVM <= 3.5 has metadata within the same hierarchy as Values
+                MDNode* var = dyn_cast<MDNode>(as_call->getOperand(0));
+                if (var->getOperand(0) != inst_ptr)
+                    continue;
+
+                DIVariable divar(dyn_cast<MDNode>(as_call->getOperand(2)));
+#else
+                auto* meta0 = dyn_cast<MetadataAsValue>(as_call->getOperand(0))
+                                  ->getMetadata();
+                if (dyn_cast<ValueAsMetadata>(meta0)->getValue() != inst_ptr)
+                    continue;
+
+                auto* meta2 = dyn_cast<MetadataAsValue>(as_call->getOperand(2))
+                                  ->getMetadata();
+                DIVariable divar(dyn_cast<MDNode>(meta2));
+#endif
+
+                out << divar.getName().str();
+                break;
+            }
+        }
+
+        out << "@" << loc.getFilename().str() << ":" << loc.getLineNumber()
+            << ")";
     }
 }
 #endif

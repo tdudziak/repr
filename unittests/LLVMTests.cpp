@@ -117,6 +117,20 @@ TEST(LLVMTests, DebugLocations)
     EXPECT_EQ("bb8@(debug.c:10)", repr(bb8));
 }
 
+TEST(LLVMTests, DebugValues)
+{
+    auto module = getTestModule("debug_ssa");
+    auto& func = *module->begin();
+
+    for (auto& bb : func) {
+        for (auto& inst : bb) {
+            if (inst.getName() == "tmp7") {
+                EXPECT_EQ("tmp7(y@debug.c:8)", repr(inst));
+            }
+        }
+    }
+}
+
 TEST(LLVMTests, StringRef)
 {
     std::string foo = "Hello, world!";
