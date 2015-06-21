@@ -195,11 +195,11 @@ void repr_stream(std::ostream& out, const T& x, overload_priority<1>)
 
 // pointers dumb and smart
 template <typename T, typename = decltype(*val<T>()),
-          typename = decltype(val<T>() == nullptr)>
+          typename = decltype(!val<T>())>
 void repr_stream(std::ostream& out, const T& x, overload_priority<2>)
 {
-    if (x == nullptr)
-        out << "nullptr";
+    if (!x)
+        out << "nullptr"; // also includes "false" iterators
     else
         out << repr(*x);
 }

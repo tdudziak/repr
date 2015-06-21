@@ -145,6 +145,6 @@ TEST(LLVMTests, Iterators)
     auto module = parseAssembly(foo_src);
 
     EXPECT_EQ("foo", repr(module->begin()));
-    EXPECT_EQ("bar", repr(module->begin()->begin()));
+    EXPECT_EQ("bb", repr(module->begin()->begin()));
     EXPECT_EQ("br label %loop", repr(module->begin()->begin()->begin()));
 }
