@@ -1,3 +1,6 @@
+#define ENABLE_REPR_LLVM
+#include <repr.hpp>
+
 #include <memory>
 
 #include <llvm/AsmParser/Parser.h>
@@ -9,7 +12,6 @@
 #include <llvm/Support/MemoryBuffer.h>
 
 #include <gtest/gtest.h>
-#include <repr.hpp>
 
 #include "test_config.h"
 

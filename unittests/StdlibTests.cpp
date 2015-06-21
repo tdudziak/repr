@@ -1,3 +1,5 @@
+#include <repr.hpp>
+
 #include <vector>
 #include <set>
 #include <map>
@@ -5,7 +7,6 @@
 #include <tuple>
 
 #include <gtest/gtest.h>
-#include <repr.hpp>
 
 using namespace std;
 

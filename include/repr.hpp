@@ -22,6 +22,7 @@
 #ifdef ENABLE_REPR_LLVM
 #include <llvm/Support/raw_ostream.h>
 
+#include <llvm/IR/Function.h>
 #include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/Value.h>
 #include <llvm/IR/Instruction.h>
