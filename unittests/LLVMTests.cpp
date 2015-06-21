@@ -137,3 +137,12 @@ TEST(LLVMTests, StringRef)
     llvm::StringRef sref(foo);
     EXPECT_EQ("\"Hello, world!\"", repr(sref));
 }
+
+TEST(LLVMTests, Iterators)
+{
+    auto module = parseAssembly(foo_src);
+
+    EXPECT_EQ("foo", repr(module->begin()));
+    EXPECT_EQ("bar", repr(module->begin()->begin()));
+    EXPECT_EQ("br label %loop", repr(module->begin()->begin()->begin()));
+}
