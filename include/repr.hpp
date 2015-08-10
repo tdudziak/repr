@@ -106,8 +106,12 @@ inline void repr_debug_loc(std::ostream& out, const llvm::Value& val)
 #else
                 auto* meta0 = dyn_cast<MetadataAsValue>(as_call->getOperand(0))
                                   ->getMetadata();
-                if (dyn_cast<ValueAsMetadata>(meta0)->getValue() != inst_ptr)
-                    continue;
+
+                if (meta0) {
+                    auto* as_vam = dyn_cast<ValueAsMetadata>(meta0);
+                    if (as_vam && as_vam->getValue() != inst_ptr)
+                        continue;
+                }
 
                 auto* meta2 = dyn_cast<MetadataAsValue>(as_call->getOperand(2))
                                   ->getMetadata();
