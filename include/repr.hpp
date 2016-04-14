@@ -13,6 +13,7 @@
 #include <type_traits>
 #include <algorithm>
 #include <functional>
+#include <cctype>
 
 // automatically enable LLVM support if llvm-c/Core.h was included
 #ifdef LLVM_C_CORE_H
@@ -137,16 +138,13 @@ inline void repr_debug_loc(std::ostream& out, const llvm::Value& val)
  * preferred for the smallest `n`. This helps to reduce guards in SFINAE-like
  * template hacks.
  */
-template <int n> struct overload_priority : public overload_priority<n + 1>
-{
+template <int n> struct overload_priority : public overload_priority<n + 1> {
 };
 
-template <> struct overload_priority<100>
-{
+template <> struct overload_priority<100> {
 };
 
-template <typename T, int n> struct tuple_repr
-{
+template <typename T, int n> struct tuple_repr {
     void operator()(const T& tuple, std::vector<std::string>* out)
     {
         tuple_repr<T, n - 1>()(tuple, out);
@@ -154,16 +152,14 @@ template <typename T, int n> struct tuple_repr
     }
 };
 
-template <typename T> struct tuple_repr<T, 0>
-{
+template <typename T> struct tuple_repr<T, 0> {
     void operator()(const T&, std::vector<std::string>*) {}
 };
 
 /**
  * Trait for testing whether a type is a C-style string or std::string.
  */
-template <typename T> struct is_string_like
-{
+template <typename T> struct is_string_like {
     static const bool value =
         is_same<T, char*>::value || is_same<T, const char*>::value ||
         is_same<typename remove_extent<T>::type, char>::value ||
@@ -230,8 +226,7 @@ void repr_stream(std::ostream& out, const T& x, overload_priority<3>)
 #endif
 
 // tuples and tuple-like things like std::pair and std::array
-template <typename T, typename = typename std::enable_if<
-                          std::tuple_size<T>::value >= 0>::type>
+template <typename T, typename = decltype(std::get<0>(val<T>()))>
 void repr_stream(std::ostream& out, const T& x, overload_priority<4>)
 {
     tuple_repr<T, std::tuple_size<T>::value> tr;
