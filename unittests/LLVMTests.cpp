@@ -2,6 +2,7 @@
 #include <repr.hpp>
 
 #include <memory>
+#include <sstream>
 
 #include <llvm/AsmParser/Parser.h>
 #include <llvm/IR/Module.h>
@@ -22,14 +23,14 @@ std::unique_ptr<llvm::Module> parseAssembly(const std::string& assembly)
     std::unique_ptr<llvm::Module> module;
     llvm::SMDiagnostic error;
 
-#if LLVM35
+#if LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR == 5
     module.reset(new llvm::Module("Module", llvm::getGlobalContext()));
 
     auto res = llvm::ParseAssemblyString(assembly.c_str(), module.get(), error,
                                          module->getContext());
 
     assert(res == module.get());
-#elif LLVM36
+#else
     module = llvm::parseAssemblyString(assembly.c_str(), error,
                                        llvm::getGlobalContext());
     assert(module != nullptr);
@@ -43,12 +44,16 @@ std::unique_ptr<llvm::Module> getTestModule(const std::string& name)
     llvm::SMDiagnostic error;
     std::unique_ptr<llvm::Module> module;
 
-#if LLVM35
-    module.reset(llvm::ParseAssemblyFile(TEST_DATA_DIR "/" + name + "-3.5.ll",
-                                         error, llvm::getGlobalContext()));
-#elif LLVM36
-    module = llvm::parseAssemblyFile(TEST_DATA_DIR "/" + name + "-3.6.ll",
-                                     error, llvm::getGlobalContext());
+    std::ostringstream osstr;
+    osstr << TEST_DATA_DIR << "/" << name << "-" << LLVM_VERSION_MAJOR << "."
+          << LLVM_VERSION_MINOR << ".ll";
+    std::string fname = osstr.str();
+
+#if LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR == 5
+    module.reset(
+        llvm::ParseAssemblyFile(fname, error, llvm::getGlobalContext()));
+#else
+    module = llvm::parseAssemblyFile(fname, error, llvm::getGlobalContext());
 #endif
 
     assert(module.get() != nullptr);
@@ -74,7 +79,7 @@ std::string bar_src = "define i32 @bar(i32 %a) #0 {\n"
 TEST(LLVMTests, ModuleFunction)
 {
     auto module = parseAssembly(foo_src + bar_src);
-    llvm::Function* foo = module->begin();
+    llvm::Function* foo = &*module->begin();
 
     EXPECT_EQ("foo", repr(foo));
     EXPECT_EQ("[foo, bar]", repr(module));
@@ -83,15 +88,15 @@ TEST(LLVMTests, ModuleFunction)
 TEST(LLVMTests, BasicBlock)
 {
     auto module = parseAssembly(foo_src);
-    llvm::Function* foo = module->begin();
+    llvm::Function* foo = &*module->begin();
     EXPECT_EQ("[bb, loop]", repr(foo->getBasicBlockList()));
 }
 
 TEST(LLVMTests, Instruction)
 {
     auto module = parseAssembly(bar_src);
-    llvm::Function* bar = module->begin();
-    llvm::BasicBlock* bb = bar->begin();
+    llvm::Function* bar = &*module->begin();
+    llvm::BasicBlock* bb = &*bar->begin();
 
     EXPECT_EQ("bb", repr(bb));
 
@@ -102,21 +107,22 @@ TEST(LLVMTests, Instruction)
     EXPECT_EQ("%0 = add i32 %a, 1", repr(inst));
 }
 
+#if LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR > 5
 TEST(LLVMTests, DebugLocations)
 {
     auto module = getTestModule("debug_unopt");
-    llvm::Function* func = module->begin();
+    llvm::Function* func = &*module->begin();
 
     auto itr = func->begin();
-    llvm::BasicBlock* bb = itr++;
-    llvm::BasicBlock* bb3 = itr++;
-    llvm::BasicBlock* bb5 = itr++;
-    llvm::BasicBlock* bb8 = itr++;
+    llvm::BasicBlock* bb = &*itr++;
+    llvm::BasicBlock* bb3 = &*itr++;
+    llvm::BasicBlock* bb5 = &*itr++;
+    llvm::BasicBlock* bb8 = &*itr++;
 
-    EXPECT_EQ("bb@(debug.c:1)", repr(bb));
-    EXPECT_EQ("bb3@(debug.c:6)", repr(bb3));
-    EXPECT_EQ("bb5@(debug.c:8)", repr(bb5));
-    EXPECT_EQ("bb8@(debug.c:10)", repr(bb8));
+    EXPECT_EQ("bb(debug.c:1)", repr(bb));
+    EXPECT_EQ("bb3(debug.c:6)", repr(bb3));
+    EXPECT_EQ("bb5(debug.c:8)", repr(bb5));
+    EXPECT_EQ("bb8(debug.c:10)", repr(bb8));
 }
 
 TEST(LLVMTests, DebugValues)
@@ -132,6 +138,7 @@ TEST(LLVMTests, DebugValues)
         }
     }
 }
+#endif
 
 TEST(LLVMTests, StringRef)
 {
@@ -145,6 +152,12 @@ TEST(LLVMTests, Iterators)
     auto module = parseAssembly(foo_src);
 
     EXPECT_EQ("foo", repr(module->begin()));
+    EXPECT_EQ("foo", repr(*module->begin()));
+    EXPECT_EQ("foo", repr(&*module->begin()));
     EXPECT_EQ("bb", repr(module->begin()->begin()));
+    EXPECT_EQ("bb", repr(*module->begin()->begin()));
+    EXPECT_EQ("bb", repr(&*module->begin()->begin()));
     EXPECT_EQ("br label %loop", repr(module->begin()->begin()->begin()));
+    EXPECT_EQ("br label %loop", repr(*module->begin()->begin()->begin()));
+    EXPECT_EQ("br label %loop", repr(&*module->begin()->begin()->begin()));
 }

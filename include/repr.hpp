@@ -63,70 +63,144 @@ using std::remove_extent;
 using std::remove_reference;
 
 #ifdef ENABLE_REPR_LLVM
-inline void repr_debug_loc(std::ostream& out, const llvm::Value& val)
+struct debug_info {
+    std::string name = "";
+    std::string file = "";
+    int line_number = -1;
+    int column_number = -1;
+};
+
+inline void find_debug_info(const llvm::Value& val, debug_info* dinfo)
 {
     using namespace llvm;
+    auto* instr_ptr = dyn_cast<Instruction>(&val);
 
-    if (auto bb_ptr = dyn_cast<BasicBlock>(&val)) {
-        // find the first instruction with debug info
-        for (auto& inst : *bb_ptr) {
-            if (MDNode* md = inst.getMetadata("dbg")) {
-                DILocation loc(md);
-                out << "@(" << loc.getFilename().str() << ":"
-                    << loc.getLineNumber() << ")";
-                return;
-            }
+#if LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR >= 6
+    MDNode* mdata = instr_ptr ? instr_ptr->getMetadata("dbg") : nullptr;
+
+#if LLVM_VERSION_MINOR == 6
+    DILocation diloc_val(mdata);
+    DILocation* dloc = &diloc_val;
+#else
+    DILocation* dloc = dyn_cast_or_null<DILocation>(mdata);
+#endif
+
+    if (dloc) {
+#if LLVM_VERSION_MINOR == 6
+        dinfo->line_number = dloc->getLineNumber();
+        dinfo->column_number = dloc->getColumnNumber();
+        DIScope discope_val(dloc->getScope());
+        DIScope* discope = &discope_val;
+#else
+        dinfo->line_number = dloc->getLine();
+        dinfo->column_number = dloc->getColumn();
+        DIScope* discope = dyn_cast_or_null<DIScope>(dloc->getScope());
+#endif
+
+        if (discope != nullptr) {
+            std::string fname = discope->getFilename().str();
+            if (fname.size() > 0)
+                dinfo->file = std::move(fname);
         }
     }
+#endif
 
-    auto* inst_ptr = dyn_cast<Instruction>(&val);
-    MDNode* md = inst_ptr ? inst_ptr->getMetadata("dbg") : nullptr;
-    if (md) {
-        DILocation loc(md);
-        out << "(";
-
-        // try to find a call to llvm.dbg.value in the same BB, after the
-        // instruction, to get variable name
-        auto itr = inst_ptr->getParent()->begin();
-        while (&*itr != inst_ptr)
-            ++itr;
-
-        for (; itr != inst_ptr->getParent()->end(); ++itr) {
-            if (auto* as_call = dyn_cast<CallInst>(&*itr)) {
-                auto name = as_call->getCalledFunction()->getName().str();
-                if (name != "llvm.dbg.value")
+    // to find the variable name try to locate a call to llvm.dbg.value in the
+    // same BB with this value as argument
+    if (instr_ptr != nullptr) {
+        auto* bb = instr_ptr->getParent();
+        for (auto& other_instr : *bb) {
+            if (auto* as_call = dyn_cast<CallInst>(&other_instr)) {
+                auto fname = as_call->getCalledFunction()->getName().str();
+                if (fname != "llvm.dbg.value")
                     continue;
+
+                std::string name;
 
 #if LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR <= 5
                 // LLVM <= 3.5 has metadata within the same hierarchy as Values
                 MDNode* var = dyn_cast<MDNode>(as_call->getOperand(0));
-                if (var->getOperand(0) != inst_ptr)
+                if (var->getOperand(0) != instr_ptr)
                     continue;
 
                 DIVariable divar(dyn_cast<MDNode>(as_call->getOperand(2)));
+                name = divar.getName().str();
 #else
                 auto* meta0 = dyn_cast<MetadataAsValue>(as_call->getOperand(0))
                                   ->getMetadata();
 
                 if (meta0) {
                     auto* as_vam = dyn_cast<ValueAsMetadata>(meta0);
-                    if (as_vam && as_vam->getValue() != inst_ptr)
+                    if (as_vam && as_vam->getValue() != instr_ptr)
                         continue;
                 }
 
                 auto* meta2 = dyn_cast<MetadataAsValue>(as_call->getOperand(2))
                                   ->getMetadata();
+
+#if LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR == 6
                 DIVariable divar(dyn_cast<MDNode>(meta2));
+                name = divar.getName().str();
+#else
+                // from LLVM 3.7 onwards DIVariable inherits from MDNode
+                auto* divar = dyn_cast_or_null<DIVariable>(meta2);
+                if (divar)
+                    name = divar->getName().str();
+#endif
 #endif
 
-                out << divar.getName().str();
-                break;
+                if (name.size() > 0)
+                    dinfo->name = std::move(name);
             }
         }
-
-        out << "@" << loc.getFilename().str() << ":" << loc.getLineNumber()
-            << ")";
     }
+}
+
+// Will print `(<name>@?<filename>:?<line_number>?)` depending on what
+// information is available, or do nothing if nothing is known.
+inline void repr_debug_loc(std::ostream& out, const llvm::Value& val)
+{
+    using namespace llvm;
+    debug_info dinfo;
+
+    if (auto bb_ptr = dyn_cast<BasicBlock>(&val)) {
+        // find the first instruction with debug info
+        for (auto& inst : *bb_ptr) {
+            find_debug_info(inst, &dinfo);
+            if (dinfo.line_number > 0)
+                break;
+        }
+
+        // the name found is not the name of the basic block
+        dinfo.name = "";
+    } else {
+        find_debug_info(val, &dinfo);
+    }
+
+    bool has_name = dinfo.name.size() > 0;
+    bool has_file = dinfo.file.size() > 0;
+    bool has_line_number = dinfo.line_number > 0;
+    std::string delayed_out = "";
+
+    if (!has_name && !has_file && !has_line_number)
+        return;
+
+    out << "(";
+
+    if (has_name) {
+        out << dinfo.name;
+        delayed_out = "@";
+    }
+
+    if (has_file) {
+        out << delayed_out << dinfo.file;
+        delayed_out = ":";
+    }
+
+    if (has_line_number)
+        out << delayed_out << dinfo.line_number;
+
+    out << ")";
 }
 #endif
 
@@ -199,16 +273,23 @@ template <typename T, typename = decltype(*val<T>()),
 void repr_stream(std::ostream& out, const T& x, overload_priority<2>)
 {
     if (!x)
-        out << "nullptr"; // also includes "false" iterators
+        out << "nullptr"; // also includes some "false" iterators
     else
         out << repr(*x);
+}
+
+// iterators and smart pointers that don't support conversions to bool
+template <typename T, typename = decltype(*val<T>())>
+void repr_stream(std::ostream& out, const T& x, overload_priority<3>)
+{
+    out << repr(*x);
 }
 
 #ifdef ENABLE_REPR_LLVM
 // all LLVM values
 template <typename T,
           typename = decltype(repr_debug_loc(val<std::ostream&>(), val<T&>()))>
-void repr_stream(std::ostream& out, const T& x, overload_priority<3>)
+void repr_stream(std::ostream& out, const T& x, overload_priority<4>)
 {
     std::string name = x.getName().str();
 
@@ -227,7 +308,7 @@ void repr_stream(std::ostream& out, const T& x, overload_priority<3>)
 
 // tuples and tuple-like things like std::pair and std::array
 template <typename T, typename = decltype(std::get<0>(val<T>()))>
-void repr_stream(std::ostream& out, const T& x, overload_priority<4>)
+void repr_stream(std::ostream& out, const T& x, overload_priority<5>)
 {
     tuple_repr<T, std::tuple_size<T>::value> tr;
     std::vector<std::string> sub_reprs;
@@ -247,7 +328,7 @@ void repr_stream(std::ostream& out, const T& x, overload_priority<4>)
 
 // ostream-printable
 template <typename T, typename = decltype(std::cout << val<T>())>
-void repr_stream(std::ostream& out, const T& x, overload_priority<5>)
+void repr_stream(std::ostream& out, const T& x, overload_priority<6>)
 {
     std::ios::fmtflags oldflags(out.flags());
     out << std::boolalpha << x;
@@ -257,7 +338,7 @@ void repr_stream(std::ostream& out, const T& x, overload_priority<5>)
 // iterable (container) of pairs; print like a map
 template <typename T, typename = decltype(val<T>().begin()->first),
           typename = decltype(val<T>().begin()->second)>
-void repr_stream(std::ostream& out, const T& xs, overload_priority<6>)
+void repr_stream(std::ostream& out, const T& xs, overload_priority<7>)
 {
     bool needs_comma = false;
     out << "{";
@@ -279,7 +360,7 @@ template <typename T,
           typename = typename enable_if<is_same<
               char, typename remove_cv<typename remove_reference<decltype(
                         *(val<T>().begin()))>::type>::type>::value>::type>
-void repr_stream(std::ostream& out, const T& xs, overload_priority<7>)
+void repr_stream(std::ostream& out, const T& xs, overload_priority<8>)
 {
     out << "\"";
     for (auto x : xs) {
@@ -290,7 +371,7 @@ void repr_stream(std::ostream& out, const T& xs, overload_priority<7>)
 
 // iterable
 template <typename T, typename = decltype(val<T>().begin())>
-void repr_stream(std::ostream& out, const T& xs, overload_priority<8>)
+void repr_stream(std::ostream& out, const T& xs, overload_priority<9>)
 {
     bool needs_brackets = false;
     std::vector<std::string> contents;
@@ -340,7 +421,7 @@ void repr_stream(std::ostream& out, const T& xs, overload_priority<8>)
 // other LLVM objects that can be printed to a raw_ostream
 template <typename T,
           typename = decltype(val<llvm::raw_ostream&>() << val<T>())>
-void repr_stream(std::ostream& out, const T& x, overload_priority<9>)
+void repr_stream(std::ostream& out, const T& x, overload_priority<10>)
 {
     std::string result;
     llvm::raw_string_ostream raw(result);
