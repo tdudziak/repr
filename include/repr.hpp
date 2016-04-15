@@ -111,8 +111,10 @@ inline void find_debug_info(const llvm::Value& val, debug_info* dinfo)
         auto* bb = instr_ptr->getParent();
         for (auto& other_instr : *bb) {
             if (auto* as_call = dyn_cast<CallInst>(&other_instr)) {
-                auto fname = as_call->getCalledFunction()->getName().str();
-                if (fname != "llvm.dbg.value")
+                auto* func = as_call->getCalledFunction();
+
+                if (func == nullptr ||
+                    func->getName().str() != "llvm.dbg.value")
                     continue;
 
                 std::string name;
